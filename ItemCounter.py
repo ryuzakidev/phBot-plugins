@@ -5,7 +5,7 @@ import json
 import os
 
 pName = 'ItemCounter'
-pVersion = '1.2'
+pVersion = '1.3'
 
 gui = QtBind.init(__name__, pName)
 baseY = 30
@@ -148,10 +148,10 @@ for x in range(8):
     buttonItems[btn] = QtBind.createButton(gui, btn + '_clicked', '', 3100, baseY + 33 + (x * 28))
     func = f'''
 def {btn}_clicked():
+    global searchText
     btn = buttonItems['{btn}']
-    txt = QtBind.text(gui, btn).strip()
-    QtBind.setText(gui, txtBxSearch, txt)
-    event_loop()
+    searchText = QtBind.text(gui, btn).strip()
+    QtBind.setText(gui, txtBxSearch, searchText)
     countItems(countIn)
     '''
     exec(func)
