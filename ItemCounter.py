@@ -5,7 +5,7 @@ import json
 import os
 
 pName = 'ItemCounter'
-pVersion = '1.1'
+pVersion = '1.2'
 
 gui = QtBind.init(__name__, pName)
 baseY = 30
@@ -152,6 +152,7 @@ def {btn}_clicked():
     txt = QtBind.text(gui, btn).strip()
     QtBind.setText(gui, txtBxSearch, txt)
     event_loop()
+    countItems(countIn)
     '''
     exec(func)
 
