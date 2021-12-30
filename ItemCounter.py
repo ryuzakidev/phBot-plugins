@@ -5,7 +5,7 @@ import json
 import os
 
 pName = 'ItemCounter'
-pVersion = '1.3'
+pVersion = '1.4'
 
 gui = QtBind.init(__name__, pName)
 baseY = 30
@@ -31,13 +31,13 @@ lblPaging = QtBind.createLabel(gui, '0/0', 100, baseY + 220)
 
 # buttons
 btnStorage = QtBind.createButton(
-    gui, 'btnStorage_clicked', "  Storage  ", 590, 57)
+    gui, 'btnStorage_clicked', "  Storage  ", 595, 57)
 btnGuildStorage = QtBind.createButton(
-    gui, 'btnGuildStorage_clicked', "  Guild Storage  ", 585, 80)
+    gui, 'btnGuildStorage_clicked', "  Guild Storage  ", 590, 80)
 btnInventory = QtBind.createButton(
-    gui, 'btnInventory_clicked', "  Inventory  ", 590, 34)
+    gui, 'btnInventory_clicked', "  Inventory  ", 595, 34)
 btnPet = QtBind.createButton(
-    gui, 'btnPet_clicked', "  Pet  ", 590, 103)
+    gui, 'btnPet_clicked', "  Pet  ", 595, 103)
 btnPagingPrev = QtBind.createButton(
     gui, 'btnPagingPrev_clicked', "<", 10, baseY + 215)
 btnPagingNext = QtBind.createButton(
@@ -231,7 +231,7 @@ def countItems(countIn, page=0):
         if i < start and countIn == 'Inventory':
             i += 1
             continue
-        if item != None and (str_in(txt, item['name'])):
+        if item != None and (str_in(txt, item['name']) or str_in(txt, item['servername'])):
             name = item['name'] + ' (+' + str(
                 item['plus']) + ')' if '_CH_' in item['servername'] or '_EU_' in item['servername'] else item['name']
             if name in itemCounter.keys():
