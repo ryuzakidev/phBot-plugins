@@ -5,7 +5,7 @@ import json
 import os
 
 pName = 'ItemCounter'
-pVersion = '1.4'
+pVersion = '1.5'
 
 gui = QtBind.init(__name__, pName)
 baseY = 30
@@ -181,7 +181,10 @@ def loadConfig():
     if os.path.exists(getConfigPath()):
         data = {}
         with open(getConfigPath(), "r") as f:
-            data = json.load(f)
+            try:
+                data = json.load(f)
+            except:
+                pass
             f.close()
         if "QuickSearchList" in data:
             quickSearchList = data["QuickSearchList"]
@@ -215,9 +218,6 @@ def countItems(countIn, page=0):
                     if pet['type'] == 'pick':
                         items = pet['items']
                         break
-        else:
-            clearLabels('None')
-            return
     except:
         clearLabels('None')
         return
@@ -227,19 +227,22 @@ def countItems(countIn, page=0):
     start = 13
     i = 0
     txt = QtBind.text(gui, txtBxSearch)
+    itemFound = False
     for item in items:
         if i < start and countIn == 'Inventory':
             i += 1
             continue
-        if item != None and (str_in(txt, item['name']) or str_in(txt, item['servername'])):
-            name = item['name'] + ' (+' + str(
-                item['plus']) + ')' if '_CH_' in item['servername'] or '_EU_' in item['servername'] else item['name']
-            if name in itemCounter.keys():
-                itemCounter[name] += item['quantity']
-            else:
-                itemCounter[name] = item['quantity']
+        if item != None:
+            itemFound = True
+            if str_in(txt, item['name']) or str_in(txt, item['servername']):
+                name = item['name'] + ' (+' + str(
+                    item['plus']) + ')' if '_CH_' in item['servername'] or '_EU_' in item['servername'] else item['name']
+                if name in itemCounter.keys():
+                    itemCounter[name] += item['quantity']
+                else:
+                    itemCounter[name] = item['quantity']
         i += 1
-    if len(itemCounter) == 0:
+    if len(itemCounter) == 0 and (len(txt) == 0 or not itemFound):
         clearLabels('None')
     # sort items
     currLetter = None
