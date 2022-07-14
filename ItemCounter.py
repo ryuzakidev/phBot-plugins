@@ -5,19 +5,23 @@ import json
 import os
 
 pName = 'ItemCounter'
-pVersion = '1.5'
+pVersion = '1.7'
+pUrl = 'https://raw.githubusercontent.com/ryuzakidev/phBot-plugins/main/ItemCounter.py'
 
 gui = QtBind.init(__name__, pName)
 baseY = 30
 pageLimit = 12
 labelItems = []
 countIn = 'Inventory'
+lastCountIn = countIn
 currPage = 0
 totalPages = 0
+lastPage = currPage
 searchText = ''
 buttonItems = {}
 quickSearchList = []
 configStamp = None
+quickSearchDeleted = False
 
 # static labels
 QtBind.createLabel(gui, 'Search', 10, baseY + 4)
@@ -38,6 +42,8 @@ btnInventory = QtBind.createButton(
     gui, 'btnInventory_clicked', "  Inventory  ", 595, 34)
 btnPet = QtBind.createButton(
     gui, 'btnPet_clicked', "  Pet  ", 595, 103)
+btnAll = QtBind.createButton(
+    gui, 'btnAll_clicked', "  All  ", 595, 126)
 btnPagingPrev = QtBind.createButton(
     gui, 'btnPagingPrev_clicked', "<", 10, baseY + 215)
 btnPagingNext = QtBind.createButton(
@@ -58,42 +64,46 @@ QtBind.createList(gui, 295, baseY - 5, 1, 670)
 
 # button events
 def btnStorage_clicked():
-    global countIn
+    global countIn, currPage
     countIn = 'Storage'
-    countItems(countIn)
+    currPage = 0
 
 def btnGuildStorage_clicked():
-    global countIn
+    global countIn, currPage
     countIn = 'Guild Storage'
-    countItems(countIn)
+    currPage = 0
 
 def btnInventory_clicked():
-    global countIn
+    global countIn, currPage
     countIn = 'Inventory'
-    countItems(countIn)
+    currPage = 0
 
 def btnPet_clicked():
-    global countIn
+    global countIn, currPage
     countIn = 'Pet'
-    countItems(countIn)
+    currPage = 0
+
+def btnAll_clicked():
+    global countIn, currPage
+    countIn = 'All'
+    currPage = 0
 
 def btnPagingPrev_clicked():
     global currPage
     currPage -= 1
     if currPage < 0:
         currPage = 0
-    countItems(countIn, currPage)
 
 def btnPagingNext_clicked():
     global currPage
     currPage += 1
     if currPage >= totalPages:
         currPage = totalPages - 1
-    countItems(countIn, currPage)
 
 def btnClearSearchBox_clicked():
+    global currPage
+    currPage = 0
     QtBind.setText(gui, txtBxSearch, '')
-    countItems(countIn)
 
 def btnQuickSearchAdd_clicked():
     txt = QtBind.text(gui, txtBxSearch).strip()
@@ -102,13 +112,14 @@ def btnQuickSearchAdd_clicked():
     updateQuickSearchButtons()
 
 def btnQuickSearchRemove_clicked():
-    global quickSearchList
+    global quickSearchList, quickSearchDeleted
     txt = QtBind.text(gui, txtBxSearch).strip()
     i = 0
     for qs in quickSearchList:
         if qs == txt:
             quickSearchList.remove(qs)
         i += 1
+    quickSearchDeleted = True
     updateQuickSearchButtons()
 
 # other functions
@@ -148,26 +159,51 @@ for x in range(8):
     buttonItems[btn] = QtBind.createButton(gui, btn + '_clicked', '', 3100, baseY + 33 + (x * 28))
     func = f'''
 def {btn}_clicked():
-    global searchText
+    global currPage
     btn = buttonItems['{btn}']
-    searchText = QtBind.text(gui, btn).strip()
-    QtBind.setText(gui, txtBxSearch, searchText)
-    countItems(countIn)
+    currPage = 0
+    QtBind.setText(gui, txtBxSearch, QtBind.text(gui, btn).strip())
     '''
     exec(func)
 
 # Called every 500ms
 def event_loop():
-    global searchText, configStamp
+    global searchText, configStamp, lastCountIn, lastPage, currPage
     txt = QtBind.text(gui, txtBxSearch)
-    if searchText != txt:
-        countItems(countIn)
+    if searchText != txt or lastCountIn != countIn or lastPage != currPage:
+        if lastPage == currPage:
+            currPage = 0
+        countItems(countIn, currPage)
     searchText = txt
+    lastCountIn = countIn
+    lastPage = currPage
     # update if config is changed
     stamp = os.stat(getConfigPath()).st_mtime
     if stamp != configStamp:
         loadConfig()
     configStamp = stamp
+
+# Return the sox type as text, empty if none is found
+def getSoXText(servername,level):
+	if level < 101:
+		if servername.endswith('A_RARE'):
+			return '^Star'
+		elif servername.endswith('B_RARE'):
+			return '^Moon'
+		elif servername.endswith('C_RARE'):
+			return '^Sun'
+	else:
+		if servername.endswith('A_RARE'):
+			return '^Nova'
+		elif servername.endswith('B_RARE'):
+			return '^Rare'
+		elif servername.endswith('C_RARE'):
+			return '^Legend'
+		elif servername.endswith('SET_A'):
+			return '^Egy A'
+		elif servername.endswith('SET_B'):
+			return '^Egy B'
+	return ''
 
 # plugin folder path
 def getPath():
@@ -191,10 +227,14 @@ def loadConfig():
     updateQuickSearchButtons()
 # save config data
 def saveConfig():
+    global quickSearchDeleted
     data = {"QuickSearchList": quickSearchList}
+    if len(quickSearchList) == 0 and not quickSearchDeleted:
+        return
     with open(getConfigPath(), "w") as f:
         f.write(json.dumps(data, indent=4, sort_keys=True))
         f.close()
+    quickSearchDeleted = False
 
 def countItems(countIn, page=0):
     global currPage, totalPages, pageLimit
@@ -202,6 +242,7 @@ def countItems(countIn, page=0):
     clearLabels()
     items = []
     itemCounter = {}
+    start = 13 # for not showing weapon and set parts
     # get items
     try:
         if countIn == 'Storage':
@@ -218,13 +259,44 @@ def countItems(countIn, page=0):
                     if pet['type'] == 'pick':
                         items = pet['items']
                         break
-    except:
+        elif countIn == 'All':
+            # char items
+            charItems = get_inventory()['items']
+            if charItems is not None:
+                iterator = 0
+                for i in charItems:
+                    if iterator < start:
+                        iterator += 1
+                    elif i is not None:
+                        items.append(i)
+            # storage items
+            storageItems = get_storage()['items']
+            if storageItems is not None:
+                for i in storageItems:
+                    if i is not None:
+                        items.append(i)
+            # guild storage items
+            guildStorageItems = get_guild_storage()['items']
+            if guildStorageItems is not None:
+                for i in guildStorageItems:
+                    if i is not None:
+                        items.append(i)
+            # pet items
+            pets = get_pets()
+            if pets != None:
+                for k in pets:
+                    pet = pets[k]
+                    if pet['type'] == 'pick':
+                        for i in pet['items']:
+                            if i is not None:
+                                items.append(i)
+    except Exception as e:
+        log('Error: ' + str(e))
         clearLabels('None')
         return
     # update title
     QtBind.setText(gui, lblTitle, 'ITEMS (' + countIn + ')')
     # count items
-    start = 13
     i = 0
     txt = QtBind.text(gui, txtBxSearch)
     itemFound = False
@@ -234,9 +306,23 @@ def countItems(countIn, page=0):
             continue
         if item != None:
             itemFound = True
+            level = 0
+            try:
+                itemData = get_item_string(item['servername'])
+                if itemData is not None:
+                    level = itemData['level']
+            except:
+                log('err')
+            race = '(CH)' if '_CH_' in item['servername'] else '(EU)'
+            gender = ''
+            if '_W_' in item['servername']:
+                gender = '[F]'
+            elif '_M_' in item['servername']:
+                gender = '[M]'
             if str_in(txt, item['name']) or str_in(txt, item['servername']):
-                name = item['name'] + ' (+' + str(
-                    item['plus']) + ')' if '_CH_' in item['servername'] or '_EU_' in item['servername'] else item['name']
+                # name = item['name'] + ' (+' + str(
+                #     item['plus']) + ')' if '_CH_' in item['servername'] or '_EU_' in item['servername'] else item['name']
+                name = item['name'] + ' ' + race + (' ' + gender if gender else '') + ' ' + getSoXText(item['servername'], level) + ' (+' + str(item['plus']) + ')' if '_CH_' in item['servername'] or '_EU_' in item['servername'] else item['name']
                 if name in itemCounter.keys():
                     itemCounter[name] += item['quantity']
                 else:
@@ -267,8 +353,8 @@ def countItems(countIn, page=0):
     sortedItems = sliceDict(sortedItems, page * pageLimit, len(labelItems))
     for key in sortedItems:
         count = sortedItems[key]
-        itemString = key if count == -1 else key + ': ' + str(count)
-        QtBind.setText(gui, labelItems[i], itemString)
+        itemString = key if count == -1 else key + ': <b style="color: green;">' + str(count) + '</b>'
+        QtBind.setText(gui, labelItems[i], '<span style=\'font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;\'>' + itemString + '</span>')
         i += 1
     # paging
     QtBind.setText(gui, lblPaging, str(page + 1) + '/' + str(totalPages))
@@ -289,6 +375,11 @@ def clearLabels(text=''):
     for item in labelItems:
         QtBind.setText(gui, item, text)
 
+### COMMUNICATION WITH OTHER CHARACTERS IN LOCAL ###
+
+####################################################
+
+
 # check plugin folder is exists
 if not os.path.exists(getPath()):
 	# Creating plugin folder
@@ -297,3 +388,14 @@ if not os.path.exists(getPath()):
 loadConfig()
 
 log('Plugin: ['+pName+' v'+pVersion+'] successfully loaded')
+
+
+
+
+
+# use it in conditions
+def isProfileWizz():
+    return get_profile() == 'wizz'
+
+def isProfileBard():
+    return get_profile() == 'bard'
